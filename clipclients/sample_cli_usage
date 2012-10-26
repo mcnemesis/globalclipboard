@@ -1,0 +1,28 @@
+-- registration:
+curl --form "email=joewillrich@gmail.com" --form "password=password" http://localhost/clip/register
+{"payload": "Registration Complete. Check you Email Inbox"}
+
+-- registration (when already registered):
+curl --form "email=joewillrich@gmail.com" --form "password=password" http://localhost/clip/register
+
+{"payload": "Already Registered [Activation Pending]. Check your Email Inbox"}
+
+-- activate clipboard account
+curl http://localhost//clip/activate/IUZG2J31UYQKNE3OUMQWXALONG9AHKLYYCZG28QDVLO2V30L2WQXTZCRZB9_DJU6HVCYZQDKDH1MV6RZZ8HIR_GSNK9770_36BPJ
+
+Congs! Your Global Clipboard account has been activated :-) Go Copy and Paste the World!
+
+-- get a session that can be used to interact with the clipboard
+curl --form "email=joewillrich@gmail.com" --form "password=password" http://localhost/clip/session
+
+{"payload": "BSNRGX73SEM_6IP75NFF", "extra": "Session Key Included"}
+
+-- paste data to the global clipboard:
+curl --form "session=BSNRGX73SEM_6IP75NFF" --form "paste=this is my first paste" http://localhost/clip/paste
+
+{"payload": "Paste Successful"}
+
+-- copy latest paste from global clipboard:
+curl --form "session=BSNRGX73SEM_6IP75NFF" --form "paste=this is my first paste" http://localhost/clip/copy
+
+{"size": 22, "source_ip": "::1", "payload": "this is my first paste", "created": "2012-10-13 11:42:38 +0300"}
