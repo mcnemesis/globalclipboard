@@ -36,31 +36,40 @@ Apart from setting up the clients, all copy-paste with globalclipboard happens t
 Supported Clients
 ------------------
 
--- *Python-Supporting Platforms (windows, mac, *nix):*
+- **Python-Supporting Platforms (windows, mac, *nix):**
+
   Under the *clients* directory of this project, you will find a read-to-use client for pythong-supporting platforms (though I've only tested this on a standard platform -- OpenSuse 11.4 ;-)
   
+  Currently, this awesome python client works, thanks to the cross-platform clipboard project pyperclip [Al Sweigart al@coffeeghost.net].
+
   You have to check the included README for that client, for how to setup the client on your platform, then install, configure, and enjoy!
 
 
 Available Global-Clipboard Servers / Hosts:
 -------------------------------------------
 
--- *You can Host your Own*
+- **You can Host your Own**
+
   Because of the delicate nature of placing one's clibboard on the wire (much as ther's security in-built in the app), it depends on what client you choose, and 
   what you are placing on the clipboard. But, no matter what, you are free to setup your own global-clibboard server (instructions below), limited to only your LAN for example.
 
--- *Public Global-Clipboard (on EC2)*:
+- **Public Global-Clipboard (on EC2)**:
+
   I've attempted to setup a freely available global-clipboard server on ec2, so that anyone can quickly try-out and use the service without much hustle, but I can't yet guarrantee that it'll
   be able to serve *real global traffic* before I push some more resources into this project. But this is opensource, and am sure some nice peeps might pick interest.
 
 Setting up Own Global Clipboard Server (e.g on LAN):
 -----------------------------------------------------
 
--- The globalclipboard server is built with Python using the awesome and minimal web-framework web.py
--- It also uses Postgresql as the database backend (but I guess a little change to the code should make it work with any db backend u fancy -- web.py takes care of this)
--- Because it's a web.py app, I would recommend you run this as a WSGI app in an Apache container, but you could also just fire it up straight on the commandline like any python program -- web.py is awesome!
--- The server has little in terms of configuration, but you might want to change a few things in terms of logging (look at the server.py file)
--- The server is just one file, so reading and making changes to the code should be a hustle for those that want to sweat the technique ;-)
+- The globalclipboard server is built with Python using the awesome and minimal web-framework web.py
+
+- It also uses Postgresql as the database backend (but I guess a little change to the code should make it work with any db backend u fancy -- web.py takes care of this)
+
+- Because it's a web.py app, I would recommend you run this as a WSGI app in an Apache container, but you could also just fire it up straight on the commandline like any python program -- web.py is awesome!
+
+- The server has little in terms of configuration, but you might want to change a few things in terms of logging (look at the server.py file)
+
+- The server is just one file, so reading and making changes to the code should be a hustle for those that want to sweat the technique ;-)
 
 
 I might setup a google-group, or u can drop a request / ticket right here on github in case of anything.
