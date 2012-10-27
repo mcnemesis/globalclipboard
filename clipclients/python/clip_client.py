@@ -7,14 +7,40 @@ import errno
 import logging
 import requests
 from threading import Timer
+from Crypto.Cipher import DES3
+from Crypto import Random
+
+try:
+    from cStringIO import StringIO
+except:
+    from StringIO import StringIO
+
 
 VERSION = '1.0'
 CONF_FILE='~/.global_clip/client.conf'
 
 
 
-
 #----------- helpers --------------------
+def encrypt_file(in_s, out_s, chunk_size, key, iv):
+    des3 = DES3.new(key, DES3.MODE_CFB, iv)
+    while True:
+        chunk = in_s.read(chunk_size)
+        if len(chunk) == 0:
+            break
+        elif len(chunk) % 16 != 0:
+            chunk += ' ' * (16 - len(chunk) % 16)
+        out_s.write(des3.encrypt(chunk))
+
+def decrypt_file(in_s, out_s, chunk_size, key, iv):
+    des3 = DES3.new(key, DES3.MODE_CFB, iv)
+    while True:
+        chunk = in_s.read(chunk_size)
+        if len(chunk) == 0:
+            break
+        out_s.write(des3.decrypt(chunk))
+
+
 def make_sure_path_exists(path):
     try:
         os.makedirs(path)
@@ -54,6 +80,47 @@ def get_session(conf):
 def credentials(conf):
     return conf['account']
 
+def get_encryptionconf(conf):
+    econf = {
+        'key' : None,
+    }
+
+    if 'crypto' in conf:
+        econf.update(conf['crypto'])
+
+    #set a random initial-vector to be used during this session...
+    econf.update(
+            {
+                'initial_vector' : Random.get_random_bytes(8)
+            })
+
+    return econf
+
+def encrypt_clip(text,econf):
+    if econf['key'] is not None:
+        initial_vector = econf['initial_vector']
+        in_s = StringIO(text)
+        out_s = StringIO()
+        key = econf['key']
+        BLOCK_SIZE = 8192
+        encrypt_file(in_s,out_s,BLOCK_SIZE,key,initial_vector)
+        return out_s.getvalue()
+    else:
+        raise "No Encryption Key Configured Yet!"
+
+def decrypt_clip(text,econf):
+    if econf['key'] is not None:
+        initial_vector = econf['initial_vector']
+        in_s = StringIO(text)
+        out_s = StringIO()
+        key = econf['key']
+        BLOCK_SIZE = 8192
+        decrypt_file(in_s,out_s,BLOCK_SIZE,key,initial_vector)
+        return out_s.getvalue()
+    else:
+        raise "No Encryption Key Configured Yet!"
+
+
 #-------------- End Helpers ----------------
 
 make_sure_path_exists(os.path.dirname(os.path.expanduser(CONF_FILE)))
@@ -83,6 +150,9 @@ conf = {
 
     "logging" : {
         "log_file" : "/tmp/global_clip.log"
+    },
+    "crypto" : {
+        "key" : "REPLACE-ME-PLEASE!"
     }
 }
 
@@ -113,6 +183,8 @@ else:
 local_clipboard = None
 session_key = get_session(conf)
 creds = credentials(conf)
+
+encryption_conf = get_encryptionconf(conf)
 
 #periodically check for new items on the local clipboard and paste them onto the global clip
 #similarly, check for new items on the global clipboard and copy them onto the local clip
@@ -150,7 +222,10 @@ def run_clipclient():
         current_local_clip = pyperclip.paste()
         if local_clipboard != current_local_clip:
             #there's new stuff on the local clip to copy over...
-            r = requests.request('post',"%s/paste" % conf['server']['url'], data = {'session' : session_key , 'paste' : current_local_clip })
+            #First, secure the paste...
+            secure_local_clip = encrypt_clip(current_local_clip,encryption_conf)
+            #then send
+            r = requests.request('post',"%s/paste" % conf['server']['url'], data = {'session' : session_key , 'paste' : secure_local_clip })
             rj = r.json
             if r.ok and rj['status'] == 200:
                 logging.debug('Copying to Global Clipboard Successful : %s' % rj['payload'])
@@ -167,7 +242,9 @@ def run_clipclient():
         r = requests.request('post',"%s/copy" % conf['server']['url'], data = {'session' : session_key })
         rj = r.json
         if r.ok and rj['status'] == 200:
-            global_clipboard = rj['payload']
+            secure_global_clipboard = rj['payload']
+            #First, decrypt the stuff...
+            global_clipboard = decrypt_clip(secure_global_clipboard,encryption_conf)
             if global_clipboard != local_clipboard:
                 pyperclip.copy(global_clipboard)
                 local_clipboard = global_clipboard
