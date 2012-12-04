@@ -7,8 +7,8 @@ import errno
 import logging
 import requests
 from threading import Timer
-from Crypto.Cipher import DES3
-from Crypto import Random
+import gnupg
+import random
 
 try:
     from cStringIO import StringIO
@@ -17,36 +17,45 @@ except:
 
 
 VERSION = '1.0'
-CONF_FILE='~/.global_clip/client.conf'
-
+DEFAULT_HOME = '~/.global_clip'
+CONF_FILE='%s/client.conf' % DEFAULT_HOME
+GPG_HOME = '%s/.gpg' % DEFAULT_HOME
+DEFAULT_KEYFILE = '%s/.keys' % DEFAULT_HOME
+DEFAULT_SESSION = '%s/.session' % DEFAULT_HOME
 
 
 #----------- helpers --------------------
-def encrypt_file(in_s, out_s, chunk_size, key, iv):
-    des3 = DES3.new(key, DES3.MODE_CFB, iv)
-    while True:
-        chunk = in_s.read(chunk_size)
-        if len(chunk) == 0:
-            break
-        elif len(chunk) % 16 != 0:
-            chunk += ' ' * (16 - len(chunk) % 16)
-        out_s.write(des3.encrypt(chunk))
+def get_random_str(alphabet=None):
+    al = list(alphabet or 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_|{()-+!~\\/*&^%$#@')
+    random.shuffle(al)
+    p = ''.join(al[0:random.randrange(1,len(al)/2)])
+    return p
 
-def decrypt_file(in_s, out_s, chunk_size, key, iv):
-    des3 = DES3.new(key, DES3.MODE_CFB, iv)
-    while True:
-        chunk = in_s.read(chunk_size)
-        if len(chunk) == 0:
-            break
-        out_s.write(des3.decrypt(chunk))
+def encrypt_file(in_s, out_s,email):
+    gpg = gnupg.GPG(gnupghome=os.path.expanduser(GPG_HOME))
+    unencrypted_string = in_s.read()
+    encrypted_data = gpg.encrypt(unencrypted_string,email,always_trust=True)
+    if encrypted_data.ok:
+        encrypted_string = str(encrypted_data)
+        out_s.write(encrypted_string)
+    else:
+        raise BaseException("Encrption Failed!\n\n%s" % encrypted_data.stderr)
 
+def decrypt_file(in_s, out_s, mypassword):
+    gpg = gnupg.GPG(gnupghome=os.path.expanduser(GPG_HOME))
+    encrypted_string = in_s.read()
+    decrypted_data = gpg.decrypt(encrypted_string, passphrase=mypassword,always_trust=True)
+    if decrypted_data.ok:
+        out_s.write(decrypted_data.data)
+    else:
+        raise Exception("Decryption Failed!\n\n%s" % decrypted_data.stderr)
 
 def make_sure_path_exists(path):
     try:
         os.makedirs(path)
     except OSError as exception:
         if exception.errno != errno.EEXIST:
-            raise
+            raise BaseException('Path Doesn\'t Exist : %s' % path)
 
 def save_conf(conf):
     if conf:
@@ -80,45 +89,85 @@ def get_session(conf):
 def credentials(conf):
     return conf['account']
 
+def create_save_gpgkeys(key_file,myemail,mypassphrase):
+    file_path = os.path.expanduser(key_file)
+    gpg_home = os.path.expanduser(GPG_HOME)
+    os.system('rm -rf %s' % gpg_home)
+
+    #use default gpg home
+    gpg = gnupg.GPG(gnupghome=gpg_home)
+
+    if not os.path.exists(file_path):
+        #create key associated with configure email and passphrase
+        input_data = gpg.gen_key_input(
+                        name_email=myemail,
+                        passphrase=mypassphrase)
+        key = gpg.gen_key(input_data)
+        ascii_armored_public_keys = gpg.export_keys(key)
+        ascii_armored_private_keys = gpg.export_keys(key, True)
+        #save the keys (public + private) to file
+        with open(file_path, 'w') as f:
+                f.write(ascii_armored_public_keys)
+                f.write(ascii_armored_private_keys)
+
+    #then import them into our keyring..
+    key_data = open(file_path).read()
+
+    #TODO:ensure key importing works fine
+    import_result = gpg.import_keys(key_data)
+
+    #hoping all is good...
+    return True
+
 def get_encryptionconf(conf):
     econf = {
-        'key' : None,
+        'keyfile' : None,
     }
 
-    if 'crypto' in conf:
-        econf.update(conf['crypto'])
 
-    #set a random initial-vector to be used during this session...
-    econf.update(
-            {
-                'initial_vector' : Random.get_random_bytes(8)
-            })
+    creds = credentials(conf)
+
+    if 'email' not in creds:
+        raise BaseException("No Email Configured. Can't Use Encryption!")
+
+    if 'password' not in creds:
+        raise BaseException("No Password Configured. Can't Use Encryption!")
+
+    if 'crypto' in conf:
+        econf.update(conf.get('crypto',{}))
+
+        from pprint import pprint
+
+    key_file = econf.get('keyfile',None)
+
+    if (econf['keyfile'] is None) or (os.path.exists(os.path.expanduser(key_file))):
+        key_file = DEFAULT_KEYFILE
+        if create_save_gpgkeys(key_file,creds['email'],creds['password']):
+            econf['keyfile'] = key_file
+        else:
+            raise BaseException("[En|De]cryption Key File Creation Failed!")
+
+    econf.update({'email' : creds['email'],'password' : creds['password']})
 
     return econf
 
 def encrypt_clip(text,econf):
-    if econf['key'] is not None:
-        initial_vector = econf['initial_vector']
-        in_s = StringIO(text)
-        out_s = StringIO()
-        key = econf['key']
-        BLOCK_SIZE = 8192
-        encrypt_file(in_s,out_s,BLOCK_SIZE,key,initial_vector)
-        return out_s.getvalue()
+    if econf['email'] is not None:
+            in_s = StringIO(text)
+            out_s = StringIO()
+            encrypt_file(in_s,out_s,econf['email'])
+            return out_s.getvalue()
     else:
-        raise "No Encryption Key Configured Yet!"
+        raise BaseException("No [En|De]cryption Email Configured Yet!")
 
 def decrypt_clip(text,econf):
-    if econf['key'] is not None:
-        initial_vector = econf['initial_vector']
-        in_s = StringIO(text)
-        out_s = StringIO()
-        key = econf['key']
-        BLOCK_SIZE = 8192
-        decrypt_file(in_s,out_s,BLOCK_SIZE,key,initial_vector)
-        return out_s.getvalue()
+    if econf['password'] is not None:
+            in_s = StringIO(text)
+            out_s = StringIO()
+            decrypt_file(in_s,out_s,econf['password'])
+            return out_s.getvalue()
     else:
-        raise "No Encryption Key Configured Yet!"
+        raise BaseException("No [En|De]cryption Password Configured Yet!")
 
 
 #-------------- End Helpers ----------------
@@ -132,8 +181,9 @@ conf = {
     },
 
     "account" : {
-        "username" : "joewillrich@gmail.com",
-        "password" : "password"
+        #this must actually be an email address. maybe use valid random emails from a service?
+        "email" : get_random_str(alphabet='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_'),
+        "password" : get_random_str()
     },
 
     "clipboard" : {
@@ -144,7 +194,7 @@ conf = {
     },
 
     "sessions" : {
-        "session_file" : "~/.global_clip/session",
+        "session_file" : DEFAULT_SESSION,
         "allow_reset" : "true"
     },
 
@@ -152,7 +202,7 @@ conf = {
         "log_file" : "/tmp/global_clip.log"
     },
     "crypto" : {
-        "key" : "REPLACE-ME-PLEASE!"
+        "keyfile" : DEFAULT_KEYFILE
     }
 }
 
@@ -161,7 +211,7 @@ try:
     with open(os.path.expanduser(CONF_FILE),'r') as f:
         user_conf = json.loads(''.join(f.readlines()))
         if type(user_conf) is not dict:
-            raise "Invalid Conf!"
+            raise BaseException("Invalid Conf!")
 except:
     print "Failed to Read Conf File"
 
@@ -195,7 +245,7 @@ def run_clipclient():
     t = None
     if  session_key is  None:
         #try to get a session...
-        r = requests.request('post',"%s/session" % conf['server']['url'], data = {'email' : creds['username'] , 'password' : creds['password'] })
+        r = requests.request('post',"%s/session" % conf['server']['url'], data = {'email' : creds['email'] , 'password' : creds['password'] })
         rj = r.json
         if r.ok and rj['status'] == 200:
             session_key = rj['payload']
@@ -206,7 +256,7 @@ def run_clipclient():
 
     if session_key is None:
         #try to login then...
-        r = requests.request('post',"%s/register" % conf['server']['url'], data = {'email' : creds['username'] , 'password' : creds['password'] })
+        r = requests.request('post',"%s/register" % conf['server']['url'], data = {'email' : creds['email'] , 'password' : creds['password'] })
         rj = r.json
         if r.ok and rj['status'] == 200:
             logging.info("Registration Successfull: %s" % rj['payload'])
@@ -232,7 +282,11 @@ def run_clipclient():
                 local_clipboard = current_local_clip
                 t = Timer(10,run_clipclient) 
             else:
-                logging.error('Copying to Global Clipboard Failed : %s' % rj['payload'])
+                try:
+                    print secure_local_clip
+                    logging.error('Copying to Global Clipboard Failed : %s' % rj['payload'])
+                except Exception as e:
+                    logging.error('Fatal Error while trying to Copy to Clipboard : %s' % e)
                 t = Timer(30,run_clipclient) 
         else:
             logging.debug("Local Clip : old")
@@ -243,19 +297,24 @@ def run_clipclient():
         rj = r.json
         if r.ok and rj['status'] == 200:
             secure_global_clipboard = rj['payload']
+            #we expect data to be sent encoded base64
+            secure_global_clipboard = secure_global_clipboard.decode('base64')
             #First, decrypt the stuff...
             global_clipboard = decrypt_clip(secure_global_clipboard,encryption_conf)
             if global_clipboard != local_clipboard:
                 pyperclip.copy(global_clipboard)
                 local_clipboard = global_clipboard
-                logging.info("Found new Data on Global Clip from IP : %s, Size : %s" % (rj['source_ip'],rj['size'])) 
+                logging.info("Found new Data on Global Clip from IP : %s" % (rj['source_ip'])) 
                 t = Timer(10,run_clipclient) 
             else:
                 logging.debug("Global Clip : old")
                 t = Timer(10,run_clipclient) 
         else:
-            logging.error("Failed to Read Global Clip : %s " % rj['payload'])
-            t = Timer(30,run_clipclient) 
+            try:
+                logging.error("Failed to Read Global Clip : %s " % rj['payload'])
+                t = Timer(30,run_clipclient) 
+            except Exception as e:
+                logging.error("Exception : %s" % e)
 
     if t:
         t.start() #schedule next run of the clip client...

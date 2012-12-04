@@ -188,7 +188,8 @@ def get_mail_to_account_id(email):
 def save_paste(email,ip,paste):
     id = get_mail_to_account_id(email)
     if id:
-        new_id = db.insert('clipboard_write',seqname='clipboard_write_id_seq',source_ip=ip,owner=id,clipboard=paste)
+        safe_paste = paste.encode('base64')
+        new_id = db.insert('clipboard_write',seqname='clipboard_write_id_seq',source_ip=ip,owner=id,clipboard=safe_paste)
         return True if new_id else False
     else:
         return False
@@ -295,19 +296,19 @@ class paste:
     def GET(self):
         return j_e("Not Supported")
     def POST(self):
-        params = web.input(paste=None,session=None)
+        params = web.input(paste=None,session=None,_unicode=False) #because the paste might be binary data
 
         session_key = params.session
         if not session_key:
             return j_e("Invalid Paste Request : Session Key is Required")
-        params = web.input(paste=None)
+
         if params.paste:
             if is_valid_session(session_key,web.ctx.ip):
                 if save_paste(get_session_email(session_key,web.ctx.ip),web.ctx.ip,params.paste):
-                    web.debug("PASTE (%s @ %s) : %s" % (session_key,web.ctx.ip,params.paste))
+                    web.debug("PASTE (%s @ %s)" % (session_key,web.ctx.ip))
                     return j_s("Paste Successful")
                 else:
-                    web.debug("** FAILED **  PASTE (%s) : %s" % (session_key,params.paste))
+                    web.debug("** FAILED **  PASTE (%s)" % (session_key))
                     return j_e("Failed  to Paste!")
             else:
                 return j_e("This Session Key is Invalid")
@@ -328,9 +329,12 @@ class copy:
             email = get_session_email(session_key,web.ctx.ip)
             if clipboard_has_data(email):
                 copy = pop_paste(email)
+                safe_copy = copy.get('clipboard',None)
+                if safe_copy is not None:
+                    safe_copy = str(safe_copy)
                 if copy is not None:
-                    web.debug("COPY (%s @ %s) : %s" % (session_key, web.ctx.ip, copy.get('clipboard',None)))
-                    return j_s(copy.get('clipboard',None),size=len(copy.get('clipboard',None)),created=copy.get('created',None).strftime('%Y-%m-%d %H:%M:%S %z'), source_ip = copy.get('source_ip',None))
+                    web.debug("COPY (%s @ %s)" % (session_key, web.ctx.ip))
+                    return j_s(safe_copy,created=copy.get('created',None).strftime('%Y-%m-%d %H:%M:%S %z'), source_ip = copy.get('source_ip',None))
                 else:
                     web.debug("** FAILED **  COPY (%s @ %s)" % (session_key,web.ctx.ip))
                     return j_e("Failed  to Copy!")

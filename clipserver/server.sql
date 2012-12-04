@@ -37,6 +37,6 @@ CREATE TABLE clipboard_write (
     created timestamp with time zone default now(),
     owner int references accounts(id),
     source_ip varchar(100),
-    clipboard text
+    clipboard bytea
 );
 
