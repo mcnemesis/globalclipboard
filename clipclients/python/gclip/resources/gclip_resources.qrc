@@ -1,0 +1,11 @@
+<RCC>
+  <qresource prefix="images">
+    <file>icons/pause.png</file>
+    <file>icons/gclip.png</file>
+    <file>icons/download.png</file>
+    <file>icons/exit.png</file>
+    <file>icons/start.png</file>
+    <file>icons/sync.png</file>
+    <file>icons/upload.png</file>
+  </qresource>
+</RCC>

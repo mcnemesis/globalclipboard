@@ -4,6 +4,8 @@ globalclipboard
 Copy-Paste rules the World! The Uber-Geeks only need 1 Clipboard to rule them all - The Global-Clipboard!
 Get it right here, or fork yourself one!
 
+NOTE: The entire project is currently GPL3 Licensed.
+
 Motivation
 -----------
 
@@ -57,6 +59,7 @@ Supported Clients
   NOTE : 
     - This client requires the python-gnupg Python package (check installation info here http://packages.python.org/python-gnupg/). 
     - It also assumes that the clibboard server sends back clipboard content encoded in base64 (which is the current server's default behaviour)
+    - This client comes along with an Optional GUI Front-end called **GClip**, built using QT4 and PyQt4 (and currently tested on KDE4 platforms only)
 
   
 Available Global-Clipboard Servers / Hosts:
