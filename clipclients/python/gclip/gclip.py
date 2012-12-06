@@ -18,6 +18,8 @@ class GClip(kdeui.KMainWindow, Ui_GClipDialog):
         self.setupUi(rootWidget)
         self.setCentralWidget(rootWidget)
 
+        self.centerOnScreen()
+
         self.btnStart.clicked.connect(self.handle_start)
         self.btnSendRecieve.clicked.connect(self.handle_sendreceive)
         self.btnSendOnly.clicked.connect(self.handle_sendonly)
@@ -25,6 +27,13 @@ class GClip(kdeui.KMainWindow, Ui_GClipDialog):
         self.btnPause.clicked.connect(self.handle_pause)
 
         self.gclip_client = GClipClient()
+
+    def centerOnScreen(self):
+        qr = self.frameGeometry()
+        cp = QtGui.QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+
 
     def handle_start(self):
         if self.gclip_client:
@@ -57,10 +66,7 @@ if __name__ == '__main__':
     catalog     = "" #the translation catalog name -- defaults to appName
     programName = kdecore.ki18n(appName)
     version     = "1.0"
-    desc = """
-GClip v.1 : A simple front-end for the powerful Python GlobalClipboard Client, ClipClient (v.1.1)
-Nemesis Fixx (joewillrich@gmail.com) 2012
-GClip and GlobalClipboard Client are both GPL Licensed. 
+    desc = """GClip v.1 : A simple front-end for the powerful Python GlobalClipboard Client, ClipClient (v.1.1) \nGClip and GlobalClipboard Client are both GPL Licensed. 
 """
     description = kdecore.ki18n(desc)
     license     = kdecore.KAboutData.License_GPL
