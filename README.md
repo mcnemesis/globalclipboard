@@ -61,6 +61,9 @@ Supported Clients
     - It also assumes that the clibboard server sends back clipboard content encoded in base64 (which is the current server's default behaviour)
     - This client comes along with an Optional GUI Front-end called **GClip**, built using QT4 and PyQt4 (and currently tested on KDE4 platforms only)
 
+    ![GClip on OpenSuse](https://raw.github.com/mcnemesis/globalclipboard/master/clipclients/python/gclip/docs/screenshots/ScreenShot_OpenSuse_12.2.png)
+    
+
   
 Available Global-Clipboard Servers / Hosts:
 -------------------------------------------
