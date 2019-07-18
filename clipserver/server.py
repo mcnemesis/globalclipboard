@@ -22,7 +22,7 @@ BASE_URI = '/clip'
 SALT = '!](A7>(90OD(IN!.\\.3G^DKCZ)C;C:5,PV)>G;A%VCAB1[(Q2H39_U]ZTNXM5HCSY^:W@GGP8JYG9,%CEEWJZQU:KK&Q5M)^O,;H'
 
 #------------- GLOBALS -------------
-db = web.database(dbn='postgres', user='postgres', pw='postgres', db='globalclip')
+db = web.database(dbn='SCHEMA', user='USER', pw='PASS', db='DB')
 
 #------------- utils ---------------
 
